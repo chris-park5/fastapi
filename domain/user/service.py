@@ -6,7 +6,7 @@ from typing import Dict, List, Optional
 from app.logging_config import get_logger, log_github_api_call, log_error
 from app.config import GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, GITHUB_WEBHOOK_SECRET
 from .schemas import (
-    SetupWebhookRequest, WebhookResponse, RepositoriesResponse, 
+    SetupWebhookRequest, WebhookResponse, RepositoriesResponse,
     WebhooksListResponse, DeleteWebhookResponse, RepositoryInfo, WebhookInfo
 )
 
@@ -15,10 +15,10 @@ logger = get_logger("github_service")
 
 class GitHubService:
     """GitHub API 연동 서비스"""
-    
+
     def __init__(self):
         self.base_url = "https://api.github.com"
-    
+
     async def setup_repository_webhook(self, request: SetupWebhookRequest) -> WebhookResponse:
         """저장소에 웹훅 설정"""
         try:
@@ -44,13 +44,13 @@ class GitHubService:
                     },
                     json=webhook_config
                 )
-                
-                log_github_api_call(url, response.status_code, 
-                                   repo=f"{request.repo_owner}/{request.repo_name}")
-                
+
+                log_github_api_call(url, response.status_code,
+                                    repo=f"{request.repo_owner}/{request.repo_name}")
+
                 if response.status_code == 201:
                     webhook_data = response.json()
-                    
+
                     # 데이터베이스에 저장
                     await self._save_webhook_info({
                         "repo_owner": request.repo_owner,
@@ -59,12 +59,12 @@ class GitHubService:
                         "webhook_url": webhook_data["config"]["url"],
                         "access_token": request.access_token
                     })
-                    
+
                     logger.info("Webhook created successfully", extra={
                         "repository": f"{request.repo_owner}/{request.repo_name}",
                         "webhook_id": webhook_data["id"]
                     })
-                    
+
                     return WebhookResponse(
                         success=True,
                         message="Webhook created successfully",
@@ -78,22 +78,22 @@ class GitHubService:
                         "status_code": response.status_code,
                         "response": response.text
                     })
-                    
+
                     return WebhookResponse(
                         success=False,
                         message=error_msg,
                         error=response.text
                     )
-                    
+
         except Exception as e:
-            log_error("Webhook setup failed", e, 
-                     repository=f"{request.repo_owner}/{request.repo_name}")
+            log_error("Webhook setup failed", e,
+                      repository=f"{request.repo_owner}/{request.repo_name}")
             return WebhookResponse(
                 success=False,
                 message="Webhook setup failed",
                 error=str(e)
             )
-    
+
     async def get_user_repositories(self, access_token: str) -> RepositoriesResponse:
         """사용자 저장소 목록 조회"""
         try:
@@ -111,13 +111,13 @@ class GitHubService:
                         "per_page": 100
                     }
                 )
-                
+
                 log_github_api_call(url, response.status_code)
-                
+
                 if response.status_code == 200:
                     repos_data = response.json()
                     repositories = []
-                    
+
                     for repo in repos_data:
                         if repo.get("permissions", {}).get("admin", False):
                             repositories.append(RepositoryInfo(
@@ -127,9 +127,9 @@ class GitHubService:
                                 default_branch=repo["default_branch"],
                                 permissions=repo["permissions"]
                             ))
-                    
+
                     logger.info(f"Retrieved {len(repositories)} repositories with admin access")
-                    
+
                     return RepositoriesResponse(
                         success=True,
                         repositories=repositories,
@@ -138,20 +138,21 @@ class GitHubService:
                 else:
                     error_msg = "Failed to fetch repositories"
                     log_error(error_msg, status_code=response.status_code)
-                    
+
                     return RepositoriesResponse(
                         success=False,
                         error=f"{error_msg}: {response.status_code}"
                     )
-                    
+
         except Exception as e:
             log_error("Repository fetch failed", e)
             return RepositoriesResponse(
                 success=False,
                 error=str(e)
             )
-    
-    async def list_repository_webhooks(self, repo_owner: str, repo_name: str, access_token: str) -> WebhooksListResponse:
+
+    async def list_repository_webhooks(self, repo_owner: str, repo_name: str,
+                                       access_token: str) -> WebhooksListResponse:
         """저장소의 웹훅 목록 조회"""
         try:
             async with httpx.AsyncClient() as client:
@@ -163,13 +164,13 @@ class GitHubService:
                         "Accept": "application/vnd.github.v3+json"
                     }
                 )
-                
+
                 log_github_api_call(url, response.status_code, repo=f"{repo_owner}/{repo_name}")
-                
+
                 if response.status_code == 200:
                     hooks_data = response.json()
                     webhooks = []
-                    
+
                     for hook in hooks_data:
                         webhooks.append(WebhookInfo(
                             id=hook["id"],
@@ -178,7 +179,7 @@ class GitHubService:
                             events=hook["events"],
                             config=hook["config"]
                         ))
-                    
+
                     return WebhooksListResponse(
                         success=True,
                         webhooks=webhooks,
@@ -189,15 +190,16 @@ class GitHubService:
                         success=False,
                         error=f"Failed to fetch webhooks: {response.status_code}"
                     )
-                    
+
         except Exception as e:
             log_error("Webhook list fetch failed", e, repository=f"{repo_owner}/{repo_name}")
             return WebhooksListResponse(
                 success=False,
                 error=str(e)
             )
-    
-    async def delete_repository_webhook(self, webhook_id: int, repo_owner: str, repo_name: str, access_token: str) -> DeleteWebhookResponse:
+
+    async def delete_repository_webhook(self, webhook_id: int, repo_owner: str, repo_name: str,
+                                        access_token: str) -> DeleteWebhookResponse:
         """저장소의 웹훅 삭제"""
         try:
             async with httpx.AsyncClient() as client:
@@ -209,19 +211,19 @@ class GitHubService:
                         "Accept": "application/vnd.github.v3+json"
                     }
                 )
-                
-                log_github_api_call(url, response.status_code, 
-                                   repo=f"{repo_owner}/{repo_name}", webhook_id=webhook_id)
-                
+
+                log_github_api_call(url, response.status_code,
+                                    repo=f"{repo_owner}/{repo_name}", webhook_id=webhook_id)
+
                 if response.status_code == 204:
                     # 데이터베이스에서도 삭제
                     await self._delete_webhook_info(webhook_id)
-                    
+
                     logger.info("Webhook deleted successfully", extra={
                         "repository": f"{repo_owner}/{repo_name}",
                         "webhook_id": webhook_id
                     })
-                    
+
                     return DeleteWebhookResponse(
                         success=True,
                         message="Webhook deleted successfully"
@@ -232,24 +234,24 @@ class GitHubService:
                         message=f"Failed to delete webhook: {response.status_code}",
                         error=response.text
                     )
-                    
+
         except Exception as e:
-            log_error("Webhook deletion failed", e, 
-                     repository=f"{repo_owner}/{repo_name}", webhook_id=webhook_id)
+            log_error("Webhook deletion failed", e,
+                      repository=f"{repo_owner}/{repo_name}", webhook_id=webhook_id)
             return DeleteWebhookResponse(
                 success=False,
                 message="Webhook deletion failed",
                 error=str(e)
             )
-    
+
     async def get_repository_webhook_status(self, repo_owner: str, repo_name: str, access_token: str) -> Dict:
         """저장소의 웹훅 설정 상태 확인"""
         try:
             webhooks_response = await self.list_repository_webhooks(repo_owner, repo_name, access_token)
-            
+
             if not webhooks_response.success:
                 return {"error": webhooks_response.error}
-            
+
             # CICDAutoDoc 웹훅 찾기
             cicd_webhooks = []
             for webhook in webhooks_response.webhooks:
@@ -260,18 +262,18 @@ class GitHubService:
                         "events": webhook.events,
                         "url": webhook.config.get("url")
                     })
-            
+
             return {
                 "repository": f"{repo_owner}/{repo_name}",
                 "total_webhooks": len(webhooks_response.webhooks),
                 "cicd_webhooks": cicd_webhooks,
                 "has_cicd_webhook": len(cicd_webhooks) > 0
             }
-            
+
         except Exception as e:
             log_error("Webhook status check failed", e, repository=f"{repo_owner}/{repo_name}")
             return {"error": str(e)}
-    
+
     async def _save_webhook_info(self, webhook_data: Dict):
         """웹훅 정보를 데이터베이스에 저장"""
         try:
@@ -280,7 +282,7 @@ class GitHubService:
             await save_webhook_info(webhook_data)
         except Exception as e:
             log_error("Failed to save webhook info", e, webhook_id=webhook_data.get("webhook_id"))
-    
+
     async def _delete_webhook_info(self, webhook_id: int):
         """데이터베이스에서 웹훅 정보 삭제"""
         try:
